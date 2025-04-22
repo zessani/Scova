@@ -2,6 +2,8 @@
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
@@ -19,6 +21,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+templates = Jinja2Templates(directory="./../frontend")
+app.mount("/static", StaticFiles(directory="./../frontend"), name="static")
 
 data_agent = DataAgent()
 sentiment_agent = SentimentAgent()

@@ -165,6 +165,9 @@ class SentimentAgent:
                     {formatted_news}
                     
                     Please ignore any dates in the articles and analyze them as if they are current news.
+
+                    Give links for data sources.
+                    Provide a sentiment score
                     
                     Provide:
                     (be concise and relevant)
