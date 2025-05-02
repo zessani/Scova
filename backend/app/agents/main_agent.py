@@ -3,9 +3,12 @@
 from openai import OpenAI
 import asyncio
 import os
+import json
+import re
 from dotenv import load_dotenv
-from data_agent import DataAgent
-from sentiment_agent import SentimentAgent
+from agents.data_agent import DataAgent
+from agents.sentiment_agent import SentimentAgent
+from datetime import datetime, timedelta
 
 load_dotenv()
 
@@ -25,47 +28,92 @@ class CryptoAnalysisSystem:
         
         # Get sentiment analysis from sentiment agent
         print(f"Analyzing market sentiment for {symbol}...")
-        sentiment_analysis = await self.sentiment_agent.analyze_sentiment(symbol)
+        sentiment_result = await self.sentiment_agent.analyze_sentiment(symbol)
+        sentiment_analysis = sentiment_result["text"]
         
         # Store context for follow-up questions
         self.context[symbol] = {
             "market": market_analysis,
-            "sentiment": sentiment_analysis
+            "sentiment": sentiment_analysis,
+            "sentiment_score": sentiment_result["sentiment_score"],
+            "sources": sentiment_result["sources"]
         }
         
         # Combine both analyses
         print("Generating insights...")
         combined_analysis = await self.combine_analyses(symbol, market_analysis, sentiment_analysis)
         
-        return combined_analysis
+        # Return combined analysis with metadata
+        return {
+            "combined_analysis": combined_analysis,
+            "market_analysis": market_analysis,
+            "sentiment_analysis": sentiment_analysis,
+            "sentiment_score": sentiment_result["sentiment_score"],
+            "sources": sentiment_result["sources"],
+            "sources_count": sentiment_result["sources_count"]
+        }
     
     async def handle_followup(self, symbol: str, question: str):
         """Handle follow-up questions about a cryptocurrency"""
         if symbol not in self.context:
-            return f"I don't have any analysis for {symbol} yet. Would you like me to analyze it?"
+            return {
+                "response": f"I don't have any analysis for {symbol} yet. Would you like me to analyze it?",
+                "sentiment_score": 50,
+                "sources": [],
+                "sources_count": 0
+            }
         
-        context = self.context[symbol]
+        context = self.context[symbol] 
+        
+        # Extract if this is a timing/action question
+        timing_keywords = ["when", "time", "best", "optimal", "should i buy", "should i sell", "maximize"]
+        is_timing_question = any(keyword in question.lower() for keyword in timing_keywords)
+        
+        prompt_content = f"""You are Cryptosys. You've previously analyzed {symbol} with this information:
+        
+        MARKET ANALYSIS:
+        {context['market']}
+        
+        SENTIMENT ANALYSIS:
+        {context['sentiment']}
+        
+        The user is asking: "{question}"
+        
+        Answer their question directly and specifically. """
+        
+        if is_timing_question:
+            prompt_content += """Provide EXACT recommendations with:
+            1. Specific timeframes (e.g., "May 10-15" or "next Tuesday-Friday")
+            2. Specific price targets or ranges when appropriate
+            3. Clear action steps
+            
+            Be direct and concise - get straight to the point with what they should do and when.
+            """
+        else:
+            prompt_content += """Be concise and directly answer their specific question.
+            Only provide relevant information that directly answers their question.
+            
+            If they want detailed analysis, provide it - otherwise, be brief and to the point.
+            """
+        
+        prompt_content += "\nInclude a brief disclaimer at the end that this is for informational purposes only."
+        
         completion = self.client.chat.completions.create(
-            model="o1-preview",
+            model="gpt-4",
             messages=[
                 {
                     "role": "user",
-                    "content": f"""You are Cryptosys. You've previously analyzed {symbol} with this information:
-                    
-                    MARKET ANALYSIS:
-                    {context['market']}
-                    
-                    SENTIMENT ANALYSIS:
-                    {context['sentiment']}
-                    
-                    The user is asking: "{question}"
-                    
-                    Answer their question concisely based on your analysis, unless they specifically ask for detailed information."""
+                    "content": prompt_content
                 }
             ]
         )
         
-        return completion.choices[0].message.content
+        return {
+            "response": completion.choices[0].message.content,
+            "sentiment_score": context.get("sentiment_score", 50),
+            "sources": context.get("sources", []),
+            "sources_count": len(context.get("sources", []))
+        }
     
     async def combine_analyses(self, symbol: str, market_analysis: str, sentiment_analysis: str):
         """Combine market and sentiment analyses into a conversational response"""
@@ -84,20 +132,238 @@ class CryptoAnalysisSystem:
                     SENTIMENT ANALYSIS:
                     {sentiment_analysis}
                     
-                    Respond conversationally as if you're talking directly to the user. Include:
+                    Respond with a concise summary that includes:
+                    1. Current price and primary trend
+                    2. 1-2 key insights from technical and sentiment analysis
+                    3. Your overall assessment
                     
-                    1. A brief greeting with {symbol}'s current price and trend
-                    2. Key insights from technical and sentiment analysis
-                    3. Where the data agrees or conflicts
-                    4. Your overall assessment and recommendation
-                    
-                    Keep your response concise and easy to understand. Use short paragraphs and occasional bullet points.
+                    Keep your response under 200 words, unless the user has specifically requested detailed analysis.
                     """
                 }
             ]
         )
         
         return completion.choices[0].message.content
+    
+    async def predict_price_movement(self, symbol: str, timeframe: str):
+        """
+        Predict price movement for a cryptocurrency over a specific timeframe
+        
+        Args:
+            symbol: Cryptocurrency symbol (e.g., 'BTC', 'ETH')
+            timeframe: Time period for prediction ('week', 'month', '3months')
+            
+        Returns:
+            Prediction information as a dictionary
+        """
+        # Get market data from data agent
+        market_data, start_date, end_date = self.data_agent.get_market_data(symbol)
+        
+        # Get sentiment data with structured result
+        sentiment_result = await self.sentiment_agent.analyze_sentiment(symbol)
+        sentiment_analysis = sentiment_result["text"]
+        
+        # Map timeframe to days for prediction
+        timeframe_days = {
+            'week': 7,
+            'month': 30,
+            '3months': 90
+        }
+        days = timeframe_days.get(timeframe, 30)  # Default to 30 days
+        target_date = datetime.now() + timedelta(days=days)
+        
+        # Generate prediction using GPT-4
+        completion = self.client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {
+                    "role": "system",
+                    "content": f"You are a crypto market expert for Cryptosys. Today's date is {datetime.now().strftime('%B %d, %Y')}. When referring to dates, always use human-readable format like 'May 5' or 'next Monday', never use timestamps."
+                },
+                {
+                    "role": "user",
+                    "content": f"""Based on this market data:
+                    
+                    {market_data}
+                    
+                    And this sentiment analysis:
+                    
+                    {sentiment_analysis}
+                    
+                    Provide a specific price prediction for {symbol} by {target_date.strftime('%B %d, %Y')} ({days} days).
+                    
+                    Your response should include:
+                    1. Exact price range prediction (low-high)
+                    2. Most likely price point with date ranges for when it might be reached
+                    3. Specific dates or time periods to watch for significant price movements
+                    4. Clear recommendation (buy, sell, or hold) with exact timing suggestions
+                    
+                    Be specific, direct, and concise. Provide exact numbers and dates. Include a brief disclaimer at the end.
+                    """
+                }
+            ]
+        )
+        
+        return {
+            "prediction": completion.choices[0].message.content,
+            "sentiment_score": sentiment_result["sentiment_score"],
+            "sources": sentiment_result["sources"],
+            "sources_count": sentiment_result["sources_count"]
+        }
+    
+    async def optimal_trading_strategy(self, symbol: str, goal: str):
+        """
+        Generate investment strategy based on user's goal
+        
+        Args:
+            symbol: Cryptocurrency symbol (e.g., 'BTC', 'ETH')
+            goal: User's investment goal (e.g., 'maximize profit in 3 months')
+            
+        Returns:
+            Strategy analysis as a dictionary
+        """
+        # Get market data from data agent
+        market_data, start_date, end_date = self.data_agent.get_market_data(symbol)
+        
+        # Get sentiment data with structured result
+        sentiment_result = await self.sentiment_agent.analyze_sentiment(symbol)
+        sentiment_analysis = sentiment_result["text"]
+        
+        # Extract the timeframe from the question
+        timeframe_matches = re.search(r'(\d+)\s*(day|week|month|year)s?', goal.lower())
+        days = 30  # Default to one month
+        
+        if timeframe_matches:
+            amount = int(timeframe_matches.group(1))
+            unit = timeframe_matches.group(2)
+            if unit == "day":
+                days = amount
+            elif unit == "week":
+                days = amount * 7
+            elif unit == "month":
+                days = amount * 30
+            elif unit == "year":
+                days = amount * 365
+        
+        # Extract action from the question
+        action = "hold"  # Default to hold recommendation
+        if "sell" in goal.lower():
+            action = "sell"
+        elif "buy" in goal.lower():
+            action = "buy"
+        
+        # Get current date for reference
+        current_date = datetime.now()
+        
+        # Generate a response using GPT-4
+        completion = self.client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {
+                    "role": "system",
+                    "content": f"""You are a critical, intelligent crypto analyst. The current date is {current_date.strftime('%B %d, %Y')}.
+                    When analyzing investment strategies, consider ALL options:
+                    1. Buying more if that's the best strategy
+                    2. Selling if that's the best strategy
+                    3. Holding if that's the best strategy
+                    4. A mixed approach with specific timing
+                    
+                    Always match your response to the FULL timeframe the user mentioned.
+                    Be willing to challenge the user's assumptions if they're asking about an action that isn't optimal.
+                    
+                    When referring to dates, always use human-readable format like 'May 5' or 'next Monday', never use timestamps."""
+                },
+                {
+                    "role": "user",
+                    "content": f"""Based on this market data:
+                    
+                    {market_data}
+                    
+                    And this sentiment analysis:
+                    
+                    {sentiment_analysis}
+                    
+                    The user asked: "{goal}"
+                    
+                    Provide a comprehensive, intelligent strategy for {symbol} over the FULL {days}-day period mentioned.
+                    
+                    Think critically about whether the action the user asked about (buying, selling, timing) is actually the BEST approach given the data. If a different approach would be better, explain why.
+                    
+                    Include:
+                    1. Whether buying, selling, holding, or a mixed approach is best for maximum returns
+                    2. Specific timing recommendations across the FULL timeframe with exact dates
+                    3. Price targets and signals to watch for
+                    4. Clear explanation of WHY you're making these recommendations
+                    5. Different scenarios and how the user should respond to each
+                    
+                    Use the first paragraph to directly answer whether they should take the action they asked about, or if a different approach would be better for maximum returns.
+                    """
+                }
+            ]
+        )
+        
+        return {
+            "strategy": completion.choices[0].message.content,
+            "sentiment_score": sentiment_result["sentiment_score"],
+            "sources": sentiment_result["sources"],
+            "sources_count": sentiment_result["sources_count"]
+        }
+    
+    async def analyze_policy_impact(self, symbol: str, policy_description: str):
+        """
+        Analyze how a policy or regulation might impact a cryptocurrency
+        
+        Args:
+            symbol: Cryptocurrency symbol (e.g., 'BTC', 'ETH')
+            policy_description: Description of the policy/regulation
+            
+        Returns:
+            Impact analysis as a dictionary
+        """
+        # Get current market data
+        market_data, start_date, end_date = self.data_agent.get_market_data(symbol)
+        
+        # Get sentiment data with structured result
+        sentiment_result = await self.sentiment_agent.analyze_sentiment(symbol)
+        
+        # Generate analysis using GPT-4
+        completion = self.client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {
+                    "role": "system",
+                    "content": f"You are Cryptosys, a crypto regulatory analysis expert. Today's date is {datetime.now().strftime('%B %d, %Y')}. When referring to dates, always use human-readable format like 'May 5' or 'next Monday', never use timestamps."
+                },
+                {
+                    "role": "user",
+                    "content": f"""Analyze how this policy might impact {symbol}:
+                    
+                    POLICY DESCRIPTION:
+                    {policy_description}
+                    
+                    MARKET DATA:
+                    {market_data}
+                    
+                    Provide a specific impact analysis with:
+                    1. Immediate impact (next 7 days)
+                    2. Medium-term impact (1-3 months)
+                    3. Long-term impact (beyond 3 months)
+                    4. Expected price effects (percentage and dollar amounts)
+                    5. How this might affect market sentiment
+                    6. Specific recommendations for investors
+                    
+                    Be direct, specific, and concise. Include a brief disclaimer at the end.
+                    """
+                }
+            ]
+        )
+        
+        return {
+            "impact_analysis": completion.choices[0].message.content,
+            "sentiment_score": sentiment_result["sentiment_score"],
+            "sources": sentiment_result["sources"],
+            "sources_count": sentiment_result["sources_count"]
+        }
 
 async def chat():
     system = CryptoAnalysisSystem()
@@ -125,18 +391,61 @@ async def chat():
             print(f"\nAnalyzing {current_symbol}. This will take a moment...")
             
             try:
-                analysis = await system.get_complete_analysis(current_symbol)
-                print(f"\n{analysis}")
+                result = await system.get_complete_analysis(current_symbol)
+                print(f"\n{result['combined_analysis']}")
+                print(f"\nSentiment Score: {result['sentiment_score']}%")
+                print(f"Sources: {result['sources_count']}")
             except Exception as e:
                 print(f"\nI couldn't analyze {current_symbol}. Error: {e}")
                 current_symbol = None
         else:
-            # Handle follow-up question
-            try:
-                response = await system.handle_followup(current_symbol, user_input)
-                print(f"\n{response}")
-            except Exception as e:
-                print(f"\nI couldn't answer that question. Error: {e}")
+            # Check for prediction or strategy requests
+            if "predict" in user_input.lower() or "forecast" in user_input.lower():
+                timeframe = "month"  # Default
+                
+                if "week" in user_input.lower():
+                    timeframe = "week"
+                elif "3 month" in user_input.lower() or "three month" in user_input.lower():
+                    timeframe = "3months"
+                
+                try:
+                    print(f"\nGenerating price analysis for {current_symbol} over {timeframe}...")
+                    result = await system.predict_price_movement(current_symbol, timeframe)
+                    print(f"\n{result['prediction']}")
+                    print(f"\nSentiment Score: {result['sentiment_score']}%")
+                    print(f"Sources: {result['sources_count']}")
+                except Exception as e:
+                    print(f"\nI couldn't generate a price analysis. Error: {e}")
+            
+            elif any(phrase in user_input.lower() for phrase in ["when should i", "strategy", "timing", "best time", "maximize"]):
+                try:
+                    print(f"\nDeveloping investment strategy...")
+                    result = await system.optimal_trading_strategy(current_symbol, user_input)
+                    print(f"\n{result['strategy']}")
+                    print(f"\nSentiment Score: {result['sentiment_score']}%")
+                    print(f"Sources: {result['sources_count']}")
+                except Exception as e:
+                    print(f"\nI couldn't generate an investment strategy. Error: {e}")
+            
+            elif any(phrase in user_input.lower() for phrase in ["policy", "regulation", "impact", "affect"]):
+                try:
+                    print(f"\nAnalyzing potential impact...")
+                    result = await system.analyze_policy_impact(current_symbol, user_input)
+                    print(f"\n{result['impact_analysis']}")
+                    print(f"\nSentiment Score: {result['sentiment_score']}%")
+                    print(f"Sources: {result['sources_count']}")
+                except Exception as e:
+                    print(f"\nI couldn't analyze the impact. Error: {e}")
+            
+            else:
+                # Handle regular follow-up question
+                try:
+                    result = await system.handle_followup(current_symbol, user_input)
+                    print(f"\n{result['response']}")
+                    print(f"\nSentiment Score: {result['sentiment_score']}%")
+                    print(f"Sources: {result['sources_count']}")
+                except Exception as e:
+                    print(f"\nI couldn't answer that question. Error: {e}")
 
 if __name__ == "__main__":
     asyncio.run(chat())

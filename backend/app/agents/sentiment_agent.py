@@ -4,10 +4,14 @@ from openai import OpenAI
 import requests
 from dotenv import load_dotenv
 import os
+import re
 from datetime import datetime
-from langchain_community.embeddings import OpenAIEmbeddings
-from langchain_community.vectorstores import Chroma
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+import warnings
+from langchain_openai import OpenAIEmbeddings
+from langchain_chroma import Chroma
+
+# Suppress LangChain deprecation warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # Load environment variables
 load_dotenv()
@@ -21,19 +25,36 @@ class SentimentAgent:
         # News API configuration
         self.news_api_key = os.getenv('NEWS_API_KEY')
         
-        # Vector database setup
-        self.embeddings = OpenAIEmbeddings()
-        self.vector_db = self._initialize_vector_db()
+        # Vector database setup - with graceful degradation
+        self.vector_db = None
+        self.embeddings = None
+        
+        # Try to initialize vector DB if dependencies are available
+        try:
+            from langchain_community.embeddings import OpenAIEmbeddings
+            from langchain_community.vectorstores import Chroma
+            
+            self.embeddings = OpenAIEmbeddings()
+            self.vector_db = self._initialize_vector_db()
+        except ImportError:
+            print("Vector database dependencies not available. Sentiment analysis will work without historical context.")
     
     def _initialize_vector_db(self):
         """Set up ChromaDB vector database"""
         try:
+            # Try to import and use chromadb
+            import chromadb
+            from langchain_community.vectorstores import Chroma
+            
             db = Chroma(
                 collection_name="crypto_sentiment",
                 embedding_function=self.embeddings
             )
             print("Vector database initialized successfully")
             return db
+        except ImportError:
+            print("ChromaDB not installed. Install it with 'pip install chromadb' for enhanced sentiment analysis.")
+            return None
         except Exception as e:
             print(f"Error initializing vector database: {e}")
             return None
@@ -75,6 +96,9 @@ class SentimentAgent:
             return
             
         try:
+            # Import necessary classes only if vector_db is available
+            from langchain.text_splitter import RecursiveCharacterTextSplitter
+            
             # Format news articles for storage
             formatted_articles = []
             for article in news_articles:
@@ -133,56 +157,87 @@ class SentimentAgent:
             return []
 
     async def analyze_sentiment(self, symbol: str):
-        """Generate comprehensive sentiment analysis for a cryptocurrency"""
-        # Gather news data
+        """Generate sentiment analysis with metadata for a cryptocurrency"""
+        # Get news articles
         news = await self.get_news_data(symbol)
-        
-        # Store for future reference
         self.store_in_vector_db(symbol, news)
         
-        # Get historical context
-        historical_data = self.retrieve_historical_context(symbol)
-        
-        # Format data for display
+        # Format news and collect sources
         recent_news = []
+        sources = []
+        
         for article in news[:5]:
             title = article.get('title', 'No title')
             source = article.get('source', {}).get('name', 'Unknown source')
+            url = article.get('url', '')
+            
             recent_news.append(f"• {title} ({source})")
+            
+            if source and source != "Unknown source":
+                sources.append({
+                    "name": source,
+                    "title": title,
+                    "url": url
+                })
         
         formatted_news = "\n".join(recent_news) if recent_news else "No recent news found"
         
-        # Generate analysis with o1-preview model
+        # Generate analysis
         completion = self.openai.chat.completions.create(
-            model="o1-preview",
+            model="gpt-4",
             messages=[
                 {
+                    "role": "system",
+                    "content": "You are a cryptocurrency sentiment analyzer. Your analysis must end with a sentiment score in the format [SENTIMENT_SCORE: XX%] where 0-40% is bearish, 41-59% is neutral, and 60-100% is bullish."
+                },
+                {
                     "role": "user", 
-                    "content": f"""You are a cryptocurrency sentiment analyst. Your task is to analyze the provided news articles about {symbol}.
-                    
-                    Analyze these news articles about {symbol}:
-                    
-                    {formatted_news}
-                    
-                    Please ignore any dates in the articles and analyze them as if they are current news.
+                    "content": f"""Analyze these news articles about {symbol}:
 
-                    Give links for data sources.
-                    Provide a sentiment score
-                    
-                    Provide:
-                    (be concise and relevant)
-                    quote any relevant news source or tweet that is relevant to the analysis
-                    1. Overall sentiment (bullish/bearish/neutral)
-                    2. Key topics being discussed
-                    3. Notable news impact
-                    4. How sentiment might affect price
-                    5. Regulatory or policy-related insights
-                    """
+    {formatted_news}
+
+    Provide:
+    1. Overall sentiment (bullish/bearish/neutral)
+    2. Key topics being discussed
+    3. Notable news impact
+    4. How sentiment might affect price
+    5. Regulatory insights
+
+    END YOUR ANALYSIS WITH: [SENTIMENT_SCORE: XX%] where XX matches your written analysis.
+    - Very bearish: 0-20%
+    - Somewhat bearish: 21-40%
+    - Neutral: 41-59%
+    - Somewhat bullish: 60-80%
+    - Very bullish: 81-100%
+
+    Your score should precisely reflect the strength of sentiment in your analysis."
+    """
                 }
-            ]
+            ],
+            temperature=0.2
         )
-    
-        return completion.choices[0].message.content
+        
+        analysis_text = completion.choices[0].message.content
+        
+        # Extract sentiment score
+        sentiment_score = 50
+        score_match = re.search(r'\[SENTIMENT_SCORE:\s*(\d+)%\]', analysis_text)
+        if score_match:
+            try:
+                sentiment_score = int(score_match.group(1))
+                sentiment_score = max(0, min(100, sentiment_score))
+                analysis_text = analysis_text.replace(score_match.group(0), "")
+            except ValueError:
+                pass
+        
+        return {
+            "text": analysis_text,
+            "sentiment_score": sentiment_score,
+            "sources": sources,
+            "sources_count": len(sources)
+        }
+        
+        return response
 
 # Test function
 async def test():

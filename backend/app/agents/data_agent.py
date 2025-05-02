@@ -46,7 +46,7 @@ class DataAgent:
         market_data, start_date, end_date = self.get_market_data(crypto)
         
         completion = self.client.chat.completions.create(
-            model="o1-preview",
+            model="gpt-4",
             messages=[
                 {
                     "role": "user", 
