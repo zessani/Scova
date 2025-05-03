@@ -32,7 +32,7 @@ function App() {
   return (
     <Box sx={{ 
       minHeight: '100vh', 
-      backgroundColor: '#f9f9f9',
+      backgroundColor: '#fffff',
       display: 'flex',
       flexDirection: 'column'
     }}>
@@ -58,12 +58,12 @@ function App() {
             component="h1" 
             sx={{ 
               fontWeight: 700, 
-              fontFamily: 'genos',
+              fontFamily: 'monospace',
               color: '#333',
               fontSize: '1.5rem'
             }}
           >
-            AskCoinr
+            Scova
           </Typography>
           
           {/* You can add additional header elements here if needed */}
