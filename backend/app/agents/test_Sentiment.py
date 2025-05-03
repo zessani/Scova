@@ -15,8 +15,8 @@ from sentiment_agent import SentimentAgent
 async def test_sentiment_analysis():
     agent = SentimentAgent()
     
-    print("Testing sentiment analysis for ETH...")
-    result = await agent.analyze_sentiment("ETH")
+    print("Testing sentiment analysis for XRP...")
+    result = await agent.analyze_sentiment("XRP")
     
     # Pretty print the result
     print("\nSentiment Analysis Result:")

@@ -26,9 +26,11 @@ const SuggestedQueries = ({ onSuggestionClick }) => {
               borderRadius: 5,
               borderColor: '#e0e0e0',
               color: 'text.primary',
+              bgcolor: '#F5EED7',
               '&:hover': {
                 borderColor: '#f7b84b',
-                color: '#f7b84b'
+                
+            
               }
             }}
           >

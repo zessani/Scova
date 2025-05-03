@@ -41,7 +41,7 @@ const SentimentModal = ({ open, onClose, sentimentScore }) => {
         width: { xs: '90%', sm: 500 },
         maxHeight: '90vh',
         bgcolor: 'background.paper',
-        borderRadius: 2,
+        borderRadius: 6,
         boxShadow: 24,
         overflow: 'auto'
       }}>
@@ -65,103 +65,7 @@ const SentimentModal = ({ open, onClose, sentimentScore }) => {
         
         <Divider />
         
-        <Box sx={{ p: 3 }}>
-          {/* Social Media */}
-          <Box sx={{ mb: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-              <Typography variant="body2">Social Media</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Typography variant="body2" fontWeight="medium">{socialMedia}%</Typography>
-                <Typography variant="body2" sx={{ ml: 0.5, color: getTrendInfo(socialMedia).color }}>
-                  {getTrendInfo(socialMedia).icon}
-                </Typography>
-              </Box>
-            </Box>
-            <LinearProgress 
-              variant="determinate" 
-              value={socialMedia} 
-              color={socialMedia >= 60 ? "success" : socialMedia >= 40 ? "warning" : "error"}
-              sx={{ height: 8, borderRadius: 4 }}
-            />
-          </Box>
-          
-          {/* News Articles */}
-          <Box sx={{ mb: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-              <Typography variant="body2">News Articles</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Typography variant="body2" fontWeight="medium">{newsArticles}%</Typography>
-                <Typography variant="body2" sx={{ ml: 0.5, color: getTrendInfo(newsArticles).color }}>
-                  {getTrendInfo(newsArticles).icon}
-                </Typography>
-              </Box>
-            </Box>
-            <LinearProgress 
-              variant="determinate" 
-              value={newsArticles} 
-              color={newsArticles >= 60 ? "success" : newsArticles >= 40 ? "warning" : "error"}
-              sx={{ height: 8, borderRadius: 4 }}
-            />
-          </Box>
-          
-          {/* Trading Volume */}
-          <Box sx={{ mb: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-              <Typography variant="body2">Trading Volume</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Typography variant="body2" fontWeight="medium">{tradingVolume}%</Typography>
-                <Typography variant="body2" sx={{ ml: 0.5, color: getTrendInfo(tradingVolume).color }}>
-                  {getTrendInfo(tradingVolume).icon}
-                </Typography>
-              </Box>
-            </Box>
-            <LinearProgress 
-              variant="determinate" 
-              value={tradingVolume} 
-              color={tradingVolume >= 60 ? "success" : tradingVolume >= 40 ? "warning" : "error"}
-              sx={{ height: 8, borderRadius: 4 }}
-            />
-          </Box>
-          
-          {/* Market Volatility */}
-          <Box sx={{ mb: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-              <Typography variant="body2">Market Volatility</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Typography variant="body2" fontWeight="medium">{marketVolatility}%</Typography>
-                <Typography variant="body2" sx={{ ml: 0.5, color: getTrendInfo(marketVolatility).color }}>
-                  {getTrendInfo(marketVolatility).icon}
-                </Typography>
-              </Box>
-            </Box>
-            <LinearProgress 
-              variant="determinate" 
-              value={marketVolatility} 
-              color={marketVolatility >= 60 ? "success" : marketVolatility >= 40 ? "warning" : "error"}
-              sx={{ height: 8, borderRadius: 4 }}
-            />
-          </Box>
-          
-          {/* Institutional Interest */}
-          <Box sx={{ mb: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-              <Typography variant="body2">Institutional Interest</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Typography variant="body2" fontWeight="medium">{institutionalInterest}%</Typography>
-                <Typography variant="body2" sx={{ ml: 0.5, color: getTrendInfo(institutionalInterest).color }}>
-                  {getTrendInfo(institutionalInterest).icon}
-                </Typography>
-              </Box>
-            </Box>
-            <LinearProgress 
-              variant="determinate" 
-              value={institutionalInterest} 
-              color={institutionalInterest >= 60 ? "success" : institutionalInterest >= 40 ? "warning" : "error"}
-              sx={{ height: 8, borderRadius: 4 }}
-            />
-          </Box>
         </Box>
-      </Box>
     </Modal>
   );
 };

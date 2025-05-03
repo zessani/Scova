@@ -42,7 +42,7 @@ const getSourceType = (url) => {
 const getReliability = (name) => {
   if (!name) return { level: 'Medium', color: '#f7b84b' };
   
-  const highReliability = ['CoinDesk', 'Binance Research', 'Glassnode', 'CryptoQuant'];
+  const highReliability = ['CoinDesk', 'Binance Research', 'newsBTC','Cointelegraph','Glassnode', 'CryptoQuant'];
   const mediumReliability = ['Twitter', 'Medium'];
   const lowReliability = ['Reddit'];
   
@@ -58,10 +58,7 @@ const getReliability = (name) => {
   return { level: 'Medium', color: '#f7b84b' };
 };
 
-const getUpdatedTime = () => {
-  const options = ['1 day ago', '2 days ago', '3 days ago', 'Real-time'];
-  return options[Math.floor(Math.random() * options.length)];
-};
+
 
 const SourcesModal = ({ open, onClose, sources }) => {
   if (!sources || sources.length === 0) return null;
@@ -80,7 +77,7 @@ const SourcesModal = ({ open, onClose, sources }) => {
         width: { xs: '90%', sm: 600 },
         maxHeight: '90vh',
         bgcolor: 'background.paper',
-        borderRadius: 2,
+        borderRadius: 6,
         boxShadow: 24,
         overflow: 'auto'
       }}>
@@ -100,14 +97,14 @@ const SourcesModal = ({ open, onClose, sources }) => {
                 <TableCell>Source</TableCell>
                 <TableCell>Type</TableCell>
                 <TableCell>Reliability</TableCell>
-                <TableCell>Updated</TableCell>
+         
               </TableRow>
             </TableHead>
             <TableBody>
               {sources.map((source, index) => {
                 const sourceType = getSourceType(source.url);
                 const reliability = getReliability(source.name);
-                const updated = getUpdatedTime();
+              
                 
                 return (
                   <TableRow key={index}>
@@ -131,7 +128,7 @@ const SourcesModal = ({ open, onClose, sources }) => {
                         {reliability.level}
                       </Typography>
                     </TableCell>
-                    <TableCell>{updated}</TableCell>
+                   
                   </TableRow>
                 );
               })}

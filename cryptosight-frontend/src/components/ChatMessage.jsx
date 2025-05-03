@@ -46,7 +46,7 @@ const ChatMessage = ({ message }) => {
           elevation={1}
           sx={{ 
             p: 2.5, 
-            borderRadius: 3,
+            borderRadius: 8,
             backgroundColor: isUser ? '#D4AF37' : '#f8f9fa',
             color: isUser ? 'white' : 'black' 
           }}

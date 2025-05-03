@@ -159,7 +159,7 @@ const ChatInterface = () => {
       <Box 
         sx={{ 
           backgroundColor: 'white',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.12)',  // Stronger shadow
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.14)',  // Stronger shadow
           borderRadius: 4,  // Rounder edges
           overflow: 'hidden',
           display: 'flex',
@@ -199,8 +199,8 @@ const ChatInterface = () => {
           onSubmit={handleSubmit}
           sx={{ 
             p: 2, 
-            borderTop: '1px solid #e0e0e0',
-            bgcolor: '#f8f9fa',
+            
+           
           }}
         >
           <TextField
@@ -225,16 +225,18 @@ const ChatInterface = () => {
               ),
               sx: { 
                 borderRadius: 5,
+                bgcolor: '#f8f9fa',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.14)',
                 pr: 0.5,
                 '& .MuiOutlinedInput-notchedOutline': {
-                  borderColor: ''
+                  
                 }
               }
             }}
           />
         </Box>
         
-        <Box sx={{ p: 1, textAlign: 'center', borderTop: '1px solid rgba(0,0,0,0.03)' }}>
+        <Box sx={{ p: 1, textAlign: 'center', }}>
           <Typography variant="caption" color="text.secondary">
             All market analysis is for informational purposes only
           </Typography>

@@ -4,6 +4,7 @@ import { ThemeProvider, createTheme, CssBaseline,Typography, Box, Container } fr
 import Header from './components/Header';
 import ChatInterface from './components/ChatInterface';
 
+
 // Create a custom theme with our primary color
 const theme = createTheme({
   palette: {
@@ -56,12 +57,13 @@ function App() {
             variant="h5" 
             component="h1" 
             sx={{ 
-              fontWeight: 600, 
+              fontWeight: 700, 
+              fontFamily: 'genos',
               color: '#333',
               fontSize: '1.5rem'
             }}
           >
-            CoinSight
+            AskCoinr
           </Typography>
           
           {/* You can add additional header elements here if needed */}
