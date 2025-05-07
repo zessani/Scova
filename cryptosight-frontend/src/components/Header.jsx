@@ -7,7 +7,7 @@ const Header = () => {
     <AppBar position="static" color="default" elevation={1} sx={{ backgroundColor: 'white' }}>
       <Toolbar>
         <Typography variant="h5" component="div" sx={{ fontWeight: 600 }}>
-          Coinr
+          Scova
         </Typography>
       </Toolbar>
     </AppBar>

@@ -17,13 +17,13 @@ import ApiService from '../services/ApiService';
 // Helper to extract crypto symbol from user input
 const extractCryptoSymbol = (input) => {
   // Direct symbol match (e.g., "BTC", "ETH")
-  const symbolMatch = input.match(/\b(BTC|ETH|SOL|ADA|XRP|DOT|LINK|LTC)\b/i);
+  const symbolMatch = input.match(/\b(BTC|ETH|SOL|ADA|XRP|DOT|LINK|LTC|DOGE|AVAX|MATIC|UNI|SHIB)\b/i);
   
   if (symbolMatch) {
     return symbolMatch[0].toUpperCase();
   }
   
-  // Name to symbol mapping
+  // Name to symbol mapping with expanded cryptocurrencies
   const nameMap = {
     'bitcoin': 'BTC',
     'ethereum': 'ETH',
@@ -32,12 +32,18 @@ const extractCryptoSymbol = (input) => {
     'ripple': 'XRP',
     'polkadot': 'DOT',
     'chainlink': 'LINK',
-    'litecoin': 'LTC'
+    'litecoin': 'LTC',
+    'dogecoin': 'DOGE',
+    'doge': 'DOGE',
+    'avalanche': 'AVAX',
+    'polygon': 'MATIC',
+    'uniswap': 'UNI',
+    'shiba': 'SHIB'
   };
   
   // Check for crypto name (e.g., "bitcoin", "ethereum")
   for (const [name, symbol] of Object.entries(nameMap)) {
-    if (input.toLowerCase().includes(name)) {
+    if (input.toLowerCase().includes(name.toLowerCase())) {
       return symbol;
     }
   }
@@ -56,6 +62,7 @@ const ChatInterface = () => {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [currentSymbol, setCurrentSymbol] = useState(null); // Track the current cryptocurrency being discussed
   const messagesEndRef = useRef(null);
   
   // Auto scroll to bottom on new messages
@@ -63,7 +70,6 @@ const ChatInterface = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
   
-  // In your handleSubmit function
   const handleSubmit = async (e) => {
     e?.preventDefault();
     if (!input.trim() || loading) return;
@@ -79,8 +85,20 @@ const ChatInterface = () => {
     setLoading(true);
     
     try {
-      // Extract crypto symbol from input
-      const symbol = extractCryptoSymbol(input);
+      // Try to detect cryptocurrency in the input
+      const detectedSymbol = extractCryptoSymbol(input);
+      
+      // If we found a symbol in the current message, update our context
+      if (detectedSymbol) {
+        // Only update if it's different from current symbol to avoid unnecessary re-renders
+        if (detectedSymbol !== currentSymbol) {
+          console.log(`Switching context from ${currentSymbol} to ${detectedSymbol}`);
+          setCurrentSymbol(detectedSymbol);
+        }
+      }
+      
+      // Use either the detected symbol or the current context symbol
+      const symbol = detectedSymbol || currentSymbol;
       
       let response;
       
@@ -99,17 +117,18 @@ const ChatInterface = () => {
           response = await ApiService.getTradingStrategy(symbol, input);
         } else if (input.match(/policy|regulation|impact|affect/i)) {
           response = await ApiService.getPolicyImpact(symbol, input);
-        } else if (input.toLowerCase().startsWith(symbol.toLowerCase()) || 
-                  input.toLowerCase().startsWith(`analyze ${symbol.toLowerCase()}`)) {
-          // For direct analysis requests, we've already called this above,
-          // but we need the response data
+        } else if (
+          (detectedSymbol && input.toLowerCase().startsWith(detectedSymbol.toLowerCase())) || 
+          (detectedSymbol && input.toLowerCase().startsWith(`analyze ${detectedSymbol.toLowerCase()}`))
+        ) {
+          // For direct analysis requests with the symbol explicitly mentioned
           response = await ApiService.getAnalysis(symbol);
         } else {
-          // For follow-up questions
+          // For follow-up questions or when symbol is from context
           response = await ApiService.getFollowup(symbol, input);
         }
       } else {
-        // Generic response for questions not about specific cryptos
+        // Generic response for questions with no crypto context
         response = {
           response: "I can provide you with analysis on specific cryptocurrencies like Bitcoin (BTC), Ethereum (ETH), Solana (SOL), and more. Please ask about a specific cryptocurrency to get detailed insights.",
           sentiment_score: null,
@@ -153,6 +172,11 @@ const ChatInterface = () => {
     }, 100);
   };
   
+  // Debug function to show current context in the console
+  useEffect(() => {
+    console.log(`Current crypto context: ${currentSymbol || 'None'}`);
+  }, [currentSymbol]);
+  
   return (
     <Box sx={{ mb: 3 }}>
       {/* Floating chat container with shadow - matching header design */}
@@ -191,17 +215,30 @@ const ChatInterface = () => {
             <SuggestedQueries onSuggestionClick={handleSuggestionClick} />
           )}
           
+          {/* Current context indicator (optional - can be removed or styled differently) */}
+          {currentSymbol && (
+            <Box sx={{ 
+              position: 'absolute', 
+              top: 10, 
+              right: 10, 
+              bgcolor: 'rgba(212, 175, 55, 0.1)', 
+              borderRadius: 10,
+              px: 2,
+              py: 0.5,
+              fontSize: '0.75rem',
+              color: 'text.secondary'
+            }}>
+              Currently discussing: {currentSymbol}
+            </Box>
+          )}
+          
           <div ref={messagesEndRef} />
         </Box>
         
         <Box 
           component="form" 
           onSubmit={handleSubmit}
-          sx={{ 
-            p: 2, 
-            
-           
-          }}
+          sx={{ p: 2 }}
         >
           <TextField
             fullWidth
@@ -229,14 +266,14 @@ const ChatInterface = () => {
                 boxShadow: '0 4px 20px rgba(0, 0, 0, 0.14)',
                 pr: 0.5,
                 '& .MuiOutlinedInput-notchedOutline': {
-                  
+                  // Border styling if needed
                 }
               }
             }}
           />
         </Box>
         
-        <Box sx={{ p: 1, textAlign: 'center', }}>
+        <Box sx={{ p: 1, textAlign: 'center' }}>
           <Typography variant="caption" color="text.secondary">
             All market analysis is for informational purposes only
           </Typography>

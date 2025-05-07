@@ -69,6 +69,12 @@ class CryptoAnalysisSystem:
         timing_keywords = ["when", "time", "best", "optimal", "should i buy", "should i sell", "maximize"]
         is_timing_question = any(keyword in question.lower() for keyword in timing_keywords)
         
+        # Complex timing questions use o1-preview for better reasoning
+        model_to_use = "gpt-4"  # Default to GPT-4 for most queries
+        
+        if is_timing_question:
+            model_to_use = "gpt-4"  # Use GPT-4 for timing questions since it supports the prompt format we're using
+        
         prompt_content = f"""You are Cryptosys. You've previously analyzed {symbol} with this information:
         
         MARKET ANALYSIS:
@@ -99,7 +105,7 @@ class CryptoAnalysisSystem:
         prompt_content += "\nInclude a brief disclaimer at the end that this is for informational purposes only."
         
         completion = self.client.chat.completions.create(
-            model="gpt-4",
+            model=model_to_use,
             messages=[
                 {
                     "role": "user",
@@ -118,7 +124,7 @@ class CryptoAnalysisSystem:
     async def combine_analyses(self, symbol: str, market_analysis: str, sentiment_analysis: str):
         """Combine market and sentiment analyses into a conversational response"""
         completion = self.client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4",  # Use GPT-4 for analysis synthesis
             messages=[
                 {
                     "role": "user",
@@ -172,17 +178,19 @@ class CryptoAnalysisSystem:
         days = timeframe_days.get(timeframe, 30)  # Default to 30 days
         target_date = datetime.now() + timedelta(days=days)
         
+        # Current date formatted for the prompt
+        current_date_str = datetime.now().strftime('%B %d, %Y')
+        target_date_str = target_date.strftime('%B %d, %Y')
+        
         # Generate prediction using GPT-4
         completion = self.client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {
-                    "role": "system",
-                    "content": f"You are a crypto market expert for Cryptosys. Today's date is {datetime.now().strftime('%B %d, %Y')}. When referring to dates, always use human-readable format like 'May 5' or 'next Monday', never use timestamps."
-                },
-                {
                     "role": "user",
-                    "content": f"""Based on this market data:
+                    "content": f"""You are a crypto market expert for Cryptosys. Today's date is {current_date_str}. When referring to dates, always use human-readable format like 'May 5' or 'next Monday', never use timestamps.
+                    
+                    Based on this market data:
                     
                     {market_data}
                     
@@ -190,7 +198,7 @@ class CryptoAnalysisSystem:
                     
                     {sentiment_analysis}
                     
-                    Provide a specific price prediction for {symbol} by {target_date.strftime('%B %d, %Y')} ({days} days).
+                    Provide a specific price prediction for {symbol} by {target_date_str} ({days} days).
                     
                     Your response should include:
                     1. Exact price range prediction (low-high)
@@ -254,14 +262,15 @@ class CryptoAnalysisSystem:
         
         # Get current date for reference
         current_date = datetime.now()
+        current_date_str = current_date.strftime('%B %d, %Y')
         
         # Generate a response using GPT-4
         completion = self.client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {
-                    "role": "system",
-                    "content": f"""You are a critical, intelligent crypto analyst. The current date is {current_date.strftime('%B %d, %Y')}.
+                    "role": "user",
+                    "content": f"""You are a critical, intelligent crypto analyst. The current date is {current_date_str}.
                     When analyzing investment strategies, consider ALL options:
                     1. Buying more if that's the best strategy
                     2. Selling if that's the best strategy
@@ -271,11 +280,9 @@ class CryptoAnalysisSystem:
                     Always match your response to the FULL timeframe the user mentioned.
                     Be willing to challenge the user's assumptions if they're asking about an action that isn't optimal.
                     
-                    When referring to dates, always use human-readable format like 'May 5' or 'next Monday', never use timestamps."""
-                },
-                {
-                    "role": "user",
-                    "content": f"""Based on this market data:
+                    When referring to dates, always use human-readable format like 'May 5' or 'next Monday', never use timestamps.
+                    
+                    Based on this market data:
                     
                     {market_data}
                     
@@ -326,17 +333,18 @@ class CryptoAnalysisSystem:
         # Get sentiment data with structured result
         sentiment_result = await self.sentiment_agent.analyze_sentiment(symbol)
         
+        # Get current date for reference
+        current_date_str = datetime.now().strftime('%B %d, %Y')
+        
         # Generate analysis using GPT-4
         completion = self.client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {
-                    "role": "system",
-                    "content": f"You are Cryptosys, a crypto regulatory analysis expert. Today's date is {datetime.now().strftime('%B %d, %Y')}. When referring to dates, always use human-readable format like 'May 5' or 'next Monday', never use timestamps."
-                },
-                {
                     "role": "user",
-                    "content": f"""Analyze how this policy might impact {symbol}:
+                    "content": f"""You are Cryptosys, a crypto regulatory analysis expert. Today's date is {current_date_str}. When referring to dates, always use human-readable format like 'May 5' or 'next Monday', never use timestamps.
+                    
+                    Analyze how this policy might impact {symbol}:
                     
                     POLICY DESCRIPTION:
                     {policy_description}
